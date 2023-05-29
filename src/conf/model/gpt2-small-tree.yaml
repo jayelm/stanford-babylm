@@ -1,0 +1,7 @@
+# @package _global_
+
+# Use default GPT2-small architecture (124M params)
+
+model:
+  model_name_or_path: gpt2
+  pretrained_path: 'exp/debug-gpt2-small-babylm_10M/debug-gpt2-small-babylm_10M-run-42'

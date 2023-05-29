@@ -41,9 +41,11 @@ def clm_tokenize_and_group_function(examples, tokenizer, block_size: int):
     Tokenize and group functions in one pass, to prevent needing to store
     multiple copies of large datasets
     """
+    import pdb; pdb.set_trace()
     tokenized = clm_tokenize_function(examples, tokenizer)
-    grouped = group_texts(tokenized, block_size)
-    return grouped
+    tokenized["labels"] = tokenized["input_ids"].copy()
+    #grouped = group_texts(tokenized, block_size)
+    return tokenized
 
 
 def group_texts(examples, block_size: int):
@@ -111,11 +113,11 @@ def preprocess_clm(
     tokenizer: PreTrainedTokenizerFast,
 ) -> DatasetDict:
     block_size = get_block_size(args, tokenizer)
-    tokenize_and_group_function = functools.partial(
-        clm_tokenize_and_group_function,
-        tokenizer=tokenizer,
-        block_size=block_size,
-    )
+    #tokenize_and_group_function = functools.partial(
+    #    clm_tokenize_and_group_function,
+    #    tokenizer=tokenizer,
+    #    block_size=block_size,
+    #)
 
     # Get names of columns to remove.
     if args.training.do_train:
@@ -123,13 +125,24 @@ def preprocess_clm(
     else:
         columns_to_remove = raw_datasets["validation"].column_names
 
-    lm_datasets = raw_datasets.map(
-        tokenize_and_group_function,
+    ## TODO: figure out what's going on here
+    '''
+    examples = raw_datasets['train'][0:10]
+    output = clm_tokenize_and_group_function(examples, tokenizer, block_size)
+    print(output)
+    '''
+
+    lm_datasets = raw_datasets["train"].map(
+        clm_tokenize_and_group_function,
         batched=True,
         num_proc=args.data.preprocessing_num_workers,
         remove_columns=columns_to_remove,
         load_from_cache_file=not args.data.overwrite_cache,
         desc="Preprocessing data",
+        fn_kwargs={"tokenizer": tokenizer,
+        "block_size":block_size}
     )
+    import pdb; pdb.set_trace()
+
     lm_datasets.set_format("torch")
     return lm_datasets

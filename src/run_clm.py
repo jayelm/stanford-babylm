@@ -37,11 +37,11 @@ from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    Trainer,
     default_data_collator,
     is_torch_tpu_available,
     set_seed,
 )
+
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
@@ -49,6 +49,9 @@ from transformers.utils.versions import require_version
 from . import data_preprocessors
 from .arguments import Arguments, global_setup
 from .integrations import CustomWandbCallback
+from .trainer import TreeTrainer
+from .batch_tree_reg import Regularizer
+from .TreeRegularizer.GPT2_model import GPT2Model
 
 # Will error if the minimal version of Transformers is not installed. Remove at
 # your own risks.
@@ -223,7 +226,8 @@ def main(args: DictConfig) -> None:
         )
 
     # Initialize model
-    model = AutoModelForCausalLM.from_config(config)
+    # TODO: add file path to learn from pretrained
+    model = GPT2Model.from_pretrained(args.model.pretrained_path, config = config) 
     n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
     logger.info(
         f"Training new model from scratch - Total size={n_params/2**20:.2f}M params"
@@ -287,7 +291,8 @@ def main(args: DictConfig) -> None:
     if args.wandb.log:
         custom_callbacks.append(CustomWandbCallback(args))
 
-    trainer = Trainer(
+    reg = Regularizer(model = model, sim_metric= torch.nn.CosineSimilarity(dim=0), tokenizer=tokenizer, start_relax_layer=0)
+    trainer = TreeTrainer(
         model=model,
         args=args.training,
         train_dataset=train_dataset if args.training.do_train else None,
@@ -302,6 +307,7 @@ def main(args: DictConfig) -> None:
         if args.training.do_eval and not is_torch_tpu_available()
         else None,
         callbacks=custom_callbacks,
+        regularizer= reg
     )
 
     # Training
